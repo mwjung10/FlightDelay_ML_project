@@ -12,6 +12,7 @@ jupyterlab>=4.0.2
 ipykernel==6.30.1
 ipython==8.20.0
 notebook==7.0.0
+kagglehub
 
 joblib==1.5.2
 cloudpickle==3.1.1
