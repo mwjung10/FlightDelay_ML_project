@@ -1,5 +1,4 @@
 import pandas as pd
-from sklearn.preprocessing import LabelEncoder
 from typing import Tuple, List
 
 
@@ -26,9 +25,9 @@ def load_preprocessed_data(path: str = "./data/preprocessed_flight_data.csv",
     """
     Load the preprocessed flight data CSV and return X (features DataFrame) and y (target Series).
 
-    This function will label-encode object (string) columns among the selected features in-place
-    so the returned X contains numeric columns ready for classic ML models. It does not modify the
-    CSV on disk.
+    This function returns the selected feature columns and the target column as-is from the
+    preprocessed CSV. It does not perform any encoding or scaling — that should be handled by
+    the caller so that preprocessing choices remain explicit.
 
     Parameters:
         path: Path to the preprocessed CSV file (default: ./data/preprocessed_flight_data.csv)
@@ -44,15 +43,8 @@ def load_preprocessed_data(path: str = "./data/preprocessed_flight_data.csv",
     if missing:
         raise ValueError(f"Missing columns in CSV: {missing}")
 
-    df_local = df.copy()
-
-    for col in features:
-        if df_local[col].dtype == 'object':
-            le = LabelEncoder()
-            df_local[col] = le.fit_transform(df_local[col].astype(str))
-
-    X = df_local[features]
-    y = df_local[TARGET]
+    X = df[features]
+    y = df[TARGET]
     return X, y
 
 
