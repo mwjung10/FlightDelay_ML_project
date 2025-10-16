@@ -21,7 +21,8 @@ TARGET = "is_arr_delayed"
 
 
 def load_preprocessed_data(path: str = "../../data/preprocessed_flight_data.csv",
-                           features: List[str] = FEATURES) -> Tuple[pd.DataFrame, pd.Series]:
+                           features: List[str] = FEATURES,
+                           n_rows: int=3500000) -> Tuple[pd.DataFrame, pd.Series]:
     """
     Load the preprocessed flight data CSV and return X (features DataFrame) and y (target Series).
 
