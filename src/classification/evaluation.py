@@ -1,29 +1,14 @@
 import numpy as np
-from sklearn.metrics import classification_report, accuracy_score, roc_curve, auc, precision_recall_curve, confusion_matrix
-from sklearn.model_selection import cross_val_predict, StratifiedKFold
+import pandas as pd
 import matplotlib.pyplot as plt
+from sklearn.metrics import (
+    classification_report, accuracy_score, roc_curve, auc,
+    precision_recall_curve, confusion_matrix
+)
+from sklearn.model_selection import cross_val_predict, StratifiedKFold
 
 
-def evaluate_model(model, X, y, cv: int = 5):
-    """
-    Perform stratified k-fold cross-validated evaluation (out-of-fold predictions).
-
-    This function uses out-of-fold predictions to compute aggregated metrics so that the
-    reported scores reflect cross-validated performance rather than a single train/test
-    split. It requires that the estimator supports either `predict_proba` or
-    `decision_function` for score-based metrics (ROC/PR). The function will fall back
-    to decision_function if predict_proba is not available.
-
-    Parameters:
-        model: estimator (unfitted) implementing scikit-learn estimator API
-        X: features (array-like or DataFrame)
-        y: labels (array-like)
-        cv: number of stratified folds (default: 5)
-
-    Returns:
-        metrics: dict with aggregated accuracy, classification_report, confusion_matrix,
-                 roc_auc and pr_auc computed from out-of-fold predictions.
-    """
+def evaluate_model(model, X, y, cv: int = 5, no_plot: bool=False):
     skf = StratifiedKFold(n_splits=cv, shuffle=True, random_state=42)
 
     y_pred = cross_val_predict(model, X, y, cv=skf, method='predict')
@@ -36,7 +21,9 @@ def evaluate_model(model, X, y, cv: int = 5):
         try:
             y_scores = cross_val_predict(model, X, y, cv=skf, method='decision_function')
         except Exception:
-            raise ValueError("Estimator must implement predict_proba or decision_function for score-based metrics")
+            raise ValueError(
+                "Model must implement 'predict_proba' or 'decision_function'"
+            )
 
     y_scores = np.asarray(y_scores).ravel()
 
@@ -61,47 +48,109 @@ def evaluate_model(model, X, y, cv: int = 5):
         'precision': precision,
         'recall': recall,
     }
+    if no_plot:
+        plt.figure(figsize=(12, 6))
 
-    plt.figure(figsize=(12, 6))
+        plt.subplot(1, 2, 1)
+        plt.plot(fpr, tpr, color='blue', label=f'ROC AUC = {roc_auc:.2f}')
+        plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
+        plt.title(f'ROC Curve (CV={cv})')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.legend(loc='lower right')
+        plt.grid(True)
 
-    plt.subplot(1, 2, 1)
-    plt.plot(fpr, tpr, color='blue', label=f'ROC AUC = {roc_auc:.2f}')
-    plt.plot([0, 1], [0, 1], color='gray', linestyle='--')
-    plt.title(f'ROC Curve (CV={cv})')
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.legend(loc='lower right')
+        plt.subplot(1, 2, 2)
+        prevalence = np.sum(y == 1) / len(y)
+        plt.plot(recall, precision, color='green', label=f'PR AUC = {pr_auc:.2f}')
+        plt.plot([0, 1], [prevalence, prevalence], color='gray', linestyle='--',
+                label=f'Baseline (AUC = {prevalence:.3f})')
+        plt.title(f'Precision-Recall Curve (CV={cv})')
+        plt.xlabel('Recall')
+        plt.ylabel('Precision')
+        plt.legend(loc='best')
+        plt.grid(True)
 
-    plt.subplot(1, 2, 2)
-    plt.plot(recall, precision, color='green', label=f'PR AUC = {pr_auc:.2f}')
-    plt.title(f'Precision-Recall Curve (CV={cv})')
-    plt.xlabel('Recall')
-    plt.ylabel('Precision')
-    plt.legend(loc='lower left')
-
-    plt.tight_layout()
-    plt.show()
+        plt.tight_layout()
+        plt.show()
 
     return metrics
 
 
-def compare_models(models, X_test, y_test):
-    """
-    Compare multiple classification models using evaluation metrics.
+def compare_models(models_dict, X, y, cv: int = 5):
+    comparison_results = {}
 
-    Parameters:
-        models: List of tuples (model_name, model).
-        X_test: Test features.
-        y_test: True labels for the test set.
+    print("Starting model evaluation (cross-validation)...")
+    for model_name, model in models_dict.items():
+        print(f"Evaluating: {model_name}...")
+        try:
+            metrics = evaluate_model(model, X, y, cv=cv, no_plot=True)
+            comparison_results[model_name] = metrics
+            print(f"Completed: {model_name}")
+        except Exception as e:
+            print(f"FAILED: {model_name}. Error: {e}")
+    print("Evaluation finished.")
 
-    Returns:
-        comparison: Dictionary containing evaluation metrics for each model.
-    """
-    comparison = {}
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
 
-    for model_name, model in models:
-        print(f"Evaluating model: {model_name}")
-        metrics = evaluate_model(model, X_test, y_test)
-        comparison[model_name] = metrics
+    ax1.plot([0, 1], [0, 1], color='gray', linestyle='--', label='Random (AUC = 0.50)')
+    for model_name, metrics in comparison_results.items():
+        ax1.plot(
+            metrics['fpr'],
+            metrics['tpr'],
+            label=f"{model_name} (AUC = {metrics['roc_auc']:.3f})"
+        )
+    ax1.set_title(f'ROC Curve Comparison (CV={cv})')
+    ax1.set_xlabel('False Positive Rate')
+    ax1.set_ylabel('True Positive Rate')
+    ax1.legend(loc='lower right')
+    ax1.grid(True)
 
-    return comparison
+    prevalence = np.sum(y == 1) / len(y)
+    ax2.plot([0, 1], [prevalence, prevalence], color='gray', linestyle='--',
+             label=f'Baseline (AUC = {prevalence:.3f})')
+    for model_name, metrics in comparison_results.items():
+        ax2.plot(
+            metrics['recall'],
+            metrics['precision'],
+            label=f"{model_name} (AUC = {metrics['pr_auc']:.3f})"
+        )
+    ax2.set_title(f'Precision-Recall Curve Comparison (CV={cv})')
+    ax2.set_xlabel('Recall')
+    ax2.set_ylabel('Precision')
+    ax2.legend(loc='best')
+    ax2.grid(True)
+
+    plt.tight_layout()
+    plt.show()
+
+    return comparison_results
+
+
+def summarize_comparison(comparison_results, positive_class_label='1'):
+    summary_data = []
+
+    for model_name, metrics in comparison_results.items():
+        report = metrics['classification_report']
+
+        if positive_class_label not in report:
+            print(f"Warning: Key '{positive_class_label}' not found in "
+                  f"report for {model_name}. Using 'weighted avg' instead.")
+            positive_metrics = report['weighted avg']
+        else:
+            positive_metrics = report[positive_class_label]
+
+        model_summary = {
+            'Model': model_name,
+            'Accuracy': metrics['accuracy'],
+            'ROC AUC': metrics['roc_auc'],
+            'PR AUC': metrics['pr_auc'],
+            'Precision (Class +)': positive_metrics['precision'],
+            'Recall (Class +)': positive_metrics['recall'],
+            'F1-score (Class +)': positive_metrics['f1-score'],
+        }
+        summary_data.append(model_summary)
+
+    df_summary = pd.DataFrame(summary_data).set_index('Model')
+
+    return df_summary.style.format("{:.4f}").background_gradient(cmap='viridis_r', axis=0)
