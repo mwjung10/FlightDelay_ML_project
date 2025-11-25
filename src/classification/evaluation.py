@@ -17,12 +17,12 @@ def evaluate_model(model, X, y, cv: int = 5, no_plot: bool=False):
     try:
         y_proba = cross_val_predict(model, X, y, cv=skf, method='predict_proba')
         y_scores = y_proba[:, 1]
-    except Exception:
+    except Exception as e_proba:
         try:
             y_scores = cross_val_predict(model, X, y, cv=skf, method='decision_function')
-        except Exception:
+        except Exception as e_decision:
             raise ValueError(
-                "Model must implement 'predict_proba' or 'decision_function'"
+                f"Model must implement 'predict_proba' (Error: {e_proba}) or 'decision_function' (Error: {e_decision})"
             )
 
     y_scores = np.asarray(y_scores).ravel()
@@ -77,14 +77,23 @@ def evaluate_model(model, X, y, cv: int = 5, no_plot: bool=False):
     return metrics
 
 
-def compare_models(models_dict, X, y, cv: int = 5):
+def compare_models(models_dict, X, y, cv: int = 5, data_overrides=None):
     comparison_results = {}
+    if data_overrides is None:
+        data_overrides = {}
 
     print("Starting model evaluation (cross-validation)...")
     for model_name, model in models_dict.items():
         print(f"Evaluating: {model_name}...")
+
+        if model_name in data_overrides:
+            X_curr, y_curr = data_overrides[model_name]
+            print(f"  -> Using override dataset ({len(X_curr)} samples)")
+        else:
+            X_curr, y_curr = X, y
+
         try:
-            metrics = evaluate_model(model, X, y, cv=cv, no_plot=True)
+            metrics = evaluate_model(model, X_curr, y_curr, cv=cv, no_plot=True)
             comparison_results[model_name] = metrics
             print(f"Completed: {model_name}")
         except Exception as e:
@@ -133,12 +142,21 @@ def summarize_comparison(comparison_results, positive_class_label='1'):
     for model_name, metrics in comparison_results.items():
         report = metrics['classification_report']
 
-        if positive_class_label not in report:
+        # Try to find the positive class key in various formats (str, int, float, bool)
+        target_key = None
+        candidates = [positive_class_label, 1, '1', 1.0, '1.0', True, 'True']
+
+        for candidate in candidates:
+            if candidate in report:
+                target_key = candidate
+                break
+
+        if target_key is None:
             print(f"Warning: Key '{positive_class_label}' not found in "
-                  f"report for {model_name}. Using 'weighted avg' instead.")
+                  f"report for {model_name}. Available keys: {list(report.keys())}. Using 'weighted avg' instead.")
             positive_metrics = report['weighted avg']
         else:
-            positive_metrics = report[positive_class_label]
+            positive_metrics = report[target_key]
 
         model_summary = {
             'Model': model_name,
