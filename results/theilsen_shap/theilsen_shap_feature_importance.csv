@@ -1,0 +1,12 @@
+feature,mean_abs_shap
+num__dep_delay,23.384981060054375
+num__distance,0.8755424694970617
+cat__dest,0.3537343533588964
+num__month_cos,0.3156278408165437
+num__day_of_month_cos,0.3151008913990977
+num__day_of_week_sin,0.236594069746352
+num__day_of_week_cos,0.22883513310337814
+cat__origin,0.14816333524229544
+num__month_sin,0.1283007381863907
+cat__op_unique_carrier,0.12669270984263867
+num__day_of_month_sin,0.0356041043291809

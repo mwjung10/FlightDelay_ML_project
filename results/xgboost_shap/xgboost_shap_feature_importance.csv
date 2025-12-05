@@ -1,0 +1,13 @@
+feature,mean_abs_shap
+dep_time_sin,0.5158811
+dep_time_cos,0.45055145
+origin,0.41490918
+dest,0.36237618
+month_cos,0.23898622
+op_unique_carrier,0.23006791
+month_sin,0.15954435
+day_of_month_sin,0.14070557
+day_of_week_sin,0.12934914
+day_of_month_cos,0.1285276
+distance,0.106708944
+day_of_week_cos,0.06597007
